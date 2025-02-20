@@ -185,7 +185,7 @@ impl FlashblocksService {
 
                 // make sure the payload id matches the current payload id
                 if *self.current_payload_id.read().await != payload.payload_id {
-                    error!(message = "Payload ID mismatch",);
+                    error!(message = "Payload ID mismatch", current_payload_id = %self.current_payload_id.read().await, payload_id = %payload.payload_id);
                     return;
                 }
 
