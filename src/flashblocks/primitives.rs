@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
+use alloy_primitives::{Address, Bloom, Bytes, B256, U256, map::HashMap};
 use alloy_rpc_types_engine::PayloadId;
 use alloy_rpc_types_eth::Withdrawal;
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,10 @@ pub struct ExecutionPayloadFlashblockDeltaV1 {
     pub transactions: Vec<Bytes>,
     /// Array of [`Withdrawal`] enabled with V2
     pub withdrawals: Vec<Withdrawal>,
+    /// Transaction Receipts
+    pub receipts: Vec<Bytes>,
+    /// New account balances
+    pub new_account_balances: HashMap<Address, U256>,
 }
 
 /// Represents the base configuration of an execution payload that remains constant
