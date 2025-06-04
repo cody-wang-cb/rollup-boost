@@ -99,7 +99,6 @@ impl RollupBoostServer {
         if let Some(causes) = self
             .payload_trace_context
             .trace_ids_from_parent_hash(&parent_hash)
-            .await
         {
             causes.iter().for_each(|cause| {
                 tracing::Span::current().follows_from(cause);
@@ -107,8 +106,7 @@ impl RollupBoostServer {
         }
 
         self.payload_trace_context
-            .remove_by_parent_hash(&parent_hash)
-            .await;
+            .remove_by_parent_hash(&parent_hash);
 
         // async call to builder to sync the builder node
         if !self.execution_mode().is_disabled() {
@@ -157,14 +155,10 @@ impl RollupBoostServer {
 
         // Forward the get payload request to the builder
         let builder_fut = async {
-            if let Some(cause) = self.payload_trace_context.trace_id(&payload_id).await {
+            if let Some(cause) = self.payload_trace_context.trace_id(&payload_id) {
                 tracing::Span::current().follows_from(cause);
             }
-            if !self
-                .payload_trace_context
-                .has_builder_payload(&payload_id)
-                .await
-            {
+            if !self.payload_trace_context.has_builder_payload(&payload_id) {
                 info!(message = "builder has no payload, skipping get_payload call to builder");
                 tracing::Span::current().record("builder_has_payload", false);
                 return RpcResult::Ok(None);
@@ -340,14 +334,12 @@ impl EngineApiServer for RollupBoostServer {
                         "builder_building" = false,
                     );
 
-                    self.payload_trace_context
-                        .store(
-                            payload_id,
-                            fork_choice_state.head_block_hash,
-                            false,
-                            span.id(),
-                        )
-                        .await;
+                    self.payload_trace_context.store(
+                        payload_id,
+                        fork_choice_state.head_block_hash,
+                        false,
+                        span.id(),
+                    )
                 }
 
                 // We always return the value from the l2 client
@@ -369,14 +361,12 @@ impl EngineApiServer for RollupBoostServer {
                         "builder_building" = builder_result.is_ok(),
                     );
 
-                    self.payload_trace_context
-                        .store(
-                            payload_id,
-                            fork_choice_state.head_block_hash,
-                            builder_result.is_ok(),
-                            span.id(),
-                        )
-                        .await;
+                    self.payload_trace_context.store(
+                        payload_id,
+                        fork_choice_state.head_block_hash,
+                        builder_result.is_ok(),
+                        span.id(),
+                    )
                 }
 
                 return Ok(l2_response);
