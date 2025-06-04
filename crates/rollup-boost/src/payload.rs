@@ -1,6 +1,5 @@
 use alloy_primitives::{B256, Bytes};
-use futures::{StreamExt as _, stream};
-use moka::future::Cache;
+use moka::sync::Cache;
 
 use alloy_rpc_types_engine::{ExecutionPayload, ExecutionPayloadV3, PayloadId};
 use op_alloy_rpc_types_engine::{
@@ -197,71 +196,60 @@ impl PayloadTraceContext {
         }
     }
 
-    pub async fn store(
+    pub fn store(
         &self,
         payload_id: PayloadId,
         parent_hash: B256,
         builder_has_payload: bool,
         trace_id: Option<tracing::Id>,
     ) {
-        self.payload_id
-            .insert(
-                payload_id,
-                PayloadTrace {
-                    builder_has_payload,
-                    trace_id,
-                },
-            )
-            .await;
+        self.payload_id.insert(
+            payload_id,
+            PayloadTrace {
+                builder_has_payload,
+                trace_id,
+            },
+        );
         self.block_hash_to_payload_ids
             .entry(parent_hash)
             .and_upsert_with(|o| match o {
                 Some(e) => {
                     let mut payloads = e.into_value();
                     payloads.push(payload_id);
-                    std::future::ready(payloads)
+                    payloads
                 }
-                None => std::future::ready(vec![payload_id]),
-            })
-            .await;
+                None => vec![payload_id],
+            });
     }
 
-    pub async fn trace_ids_from_parent_hash(&self, parent_hash: &B256) -> Option<Vec<tracing::Id>> {
-        match self.block_hash_to_payload_ids.get(parent_hash).await {
-            Some(payload_ids) => Some(
-                stream::iter(payload_ids.iter())
-                    .filter_map(|payload_id| async {
-                        self.payload_id
-                            .get(payload_id)
-                            .await
-                            .and_then(|x| x.trace_id)
+    pub fn trace_ids_from_parent_hash(&self, parent_hash: &B256) -> Option<Vec<tracing::Id>> {
+        self.block_hash_to_payload_ids
+            .get(parent_hash)
+            .map(|payload_ids| {
+                payload_ids
+                    .iter()
+                    .filter_map(|payload_id| {
+                        self.payload_id.get(payload_id).and_then(|x| x.trace_id)
                     })
                     .collect()
-                    .await,
-            ),
-            None => None,
-        }
+            })
     }
 
-    pub async fn trace_id(&self, payload_id: &PayloadId) -> Option<tracing::Id> {
-        self.payload_id
-            .get(payload_id)
-            .await
-            .and_then(|x| x.trace_id)
+    pub fn trace_id(&self, payload_id: &PayloadId) -> Option<tracing::Id> {
+        self.payload_id.get(payload_id).and_then(|x| x.trace_id)
     }
 
-    pub async fn has_builder_payload(&self, payload_id: &PayloadId) -> bool {
+    pub fn has_builder_payload(&self, payload_id: &PayloadId) -> bool {
         self.payload_id
             .get(payload_id)
-            .await
             .map(|x| x.builder_has_payload)
             .unwrap_or_default()
     }
 
-    pub async fn remove_by_parent_hash(&self, block_hash: &B256) {
-        if let Some(payload_ids) = self.block_hash_to_payload_ids.remove(block_hash).await {
+    pub fn remove_by_parent_hash(&self, block_hash: &B256) {
+        if let Some(payload_ids) = self.block_hash_to_payload_ids.remove(block_hash) {
             for payload_id in payload_ids.iter() {
-                self.payload_id.remove(payload_id).await;
+                self.payload_id.remove(payload_id);
             }
         }
     }
